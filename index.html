@@ -180,9 +180,11 @@
   .video-wrap{background:#000;border-radius:var(--r);overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.7)}  video{width:100%;display:block;max-height:74dvh;background:#000}
   .yt{
     position:relative;aspect-ratio:9/16;width:100%;
-    max-height:74dvh;max-width:calc(74dvh * 9 / 16);margin:0 auto
+    max-height:86dvh;max-width:calc(86dvh * 9 / 16);margin:0 auto
   }
   .yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .yt:fullscreen{max-width:none;max-height:none;width:100%;height:100%;aspect-ratio:auto}
+  #s-video.active{min-height:88dvh;display:flex;flex-direction:column;justify-content:center}
   .after{text-align:center;margin-top:20px}
   .after h2{color:var(--ticket)}
   .after .muted{color:rgba(244,233,214,.6)}
@@ -296,14 +298,13 @@
    ============================================================ */
 const CONFIG = {
   name: 'Nina',
-  kosename: 'Babe',
   // Variante A: YouTube. Video als "Nicht gelistet" hochladen und hier nur die ID
   // aus dem Link eintragen, also bei youtu.be/dQw4w9WgXcQ nur dQw4w9WgXcQ.
   youtubeId: 'YLucJ2ewqW4',
   // Variante B: eigene Datei. Nur nötig, wenn youtubeId leer bleibt.
   videoSrc: 'video.mp4',        // Datei muss neben index.html liegen
   route: { from: 'KEV', to: 'NIN' },
-  finaleQuestion: 'Machst du noch ein Jahr mit mir, Babe?',
+  finaleQuestion: 'Machst du noch ein Jahr mit mir?',
   afterVideo: 'Ich liebe dich, Nina.',
 
   questions: [
@@ -536,12 +537,13 @@ function flee(e) {
 const wrap = document.getElementById('video-wrap');
 const video = document.getElementById('video');
 const useYT = !!CONFIG.youtubeId;
+let ytPlayer = null, ytReady = false, wantPlay = false;
 
 if (useYT) {
-  wrap.innerHTML = '<div class="yt"><iframe src="https://www.youtube-nocookie.com/embed/' +
-    CONFIG.youtubeId + '?rel=0&playsinline=1&modestbranding=1" title="Unser Video" ' +
-    'allow="accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen" ' +
-    'allowfullscreen></iframe></div>';
+  wrap.innerHTML = '<div class="yt" id="yt"><div id="ytplayer"></div></div>';
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
 } else {
   video.src = CONFIG.videoSrc;
   video.addEventListener('error', () => {
@@ -552,10 +554,36 @@ if (useYT) {
   });
 }
 
+window.onYouTubeIframeAPIReady = function () {
+  ytPlayer = new YT.Player('ytplayer', {
+    videoId: CONFIG.youtubeId,
+    host: 'https://www.youtube-nocookie.com',
+    playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 1 },
+    events: { onReady: () => { ytReady = true; if (wantPlay) startYT(); } }
+  });
+};
+
+function startYT() {
+  try { ytPlayer.unMute(); ytPlayer.setVolume(100); ytPlayer.playVideo(); } catch (e) {}
+}
+
+function goFullscreen(el) {
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (fn) { try { fn.call(el); } catch (e) {} }
+}
+
 document.getElementById('yes').addEventListener('click', () => {
   show('s-video');
   progress(qs.length);
-  if (!useYT) video.play().catch(() => {});
+  document.querySelector('.route').style.display = 'none';
+  if (useYT) {
+    goFullscreen(document.getElementById('yt') || wrap);
+    if (ytReady) startYT(); else wantPlay = true;
+  } else {
+    video.play().catch(() => {});
+    if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+    else goFullscreen(video);
+  }
   confetti();
 });
 
